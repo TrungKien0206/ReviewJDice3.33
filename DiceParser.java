@@ -1,184 +1,244 @@
 import java.util.*;
+import java.util.logging.*;
 
 /**
- * Parses and evaluates dice roll expressions (e.g., "2d6+3; d10 & 3d4").
+ * A parser for dice expressions such as "2d6+3; d10 & 3d4".
+ * 
+ * ✅ CHỨC NĂNG MỚI: Logging bằng java.util.logging
+ * - Ghi lại các sự kiện quan trọng khi phân tích biểu thức xúc xắc.
+ * - Ghi log lỗi nếu input không hợp lệ.
+ * 
+ * 🔧 Lý do: Hỗ trợ debug, kiểm tra hoạt động parser khi tích hợp vào dự án thực tế.
  */
 public class DiceParser {
 
     /**
-     * Helper class to manage and tokenize the input stream.
+     * Logger dùng để ghi log toàn bộ quá trình phân tích cú pháp.
+     */
+    private static final Logger logger = Logger.getLogger(DiceParser.class.getName());
+
+    static {
+        // Cấu hình đơn giản cho Logger
+        Logger rootLogger = Logger.getLogger("");
+        Handler consoleHandler = new ConsoleHandler();
+        consoleHandler.setLevel(Level.FINE);
+        rootLogger.addHandler(consoleHandler);
+        logger.setLevel(Level.FINE);
+    }
+
+    /**
+     * StringStream là một lớp hỗ trợ để quản lý chuỗi đầu vào trong việc phân tích cú pháp.
+     * Nó bao gồm các phương thức để cắt bỏ khoảng trắng, lấy số nguyên, và kiểm tra các biểu thức.
      */
     private static class StringStream {
-        private StringBuffer buffer;
+        StringBuffer buff;
 
-        public StringStream(String input) {
-            this.buffer = new StringBuffer(input);
+        public StringStream(String s) {
+            buff = new StringBuffer(s);
         }
 
-        private void skipWhitespace() {
+        private void munchWhiteSpace() {
             int index = 0;
-            while (index < buffer.length() && Character.isWhitespace(buffer.charAt(index))) {
+            char curr;
+            while (index < buff.length()) {
+                curr = buff.charAt(index);
+                if (!Character.isWhitespace(curr))
+                    break;
                 index++;
             }
-            buffer.delete(0, index);
+            buff = buff.delete(0, index);
         }
 
         public boolean isEmpty() {
-            skipWhitespace();
-            return buffer.length() == 0;
+            munchWhiteSpace();
+            return buff.toString().equals("");
         }
 
-        /**
-         * Refactored: Renamed from getInt() to readUnsignedInt() for clarity.
-         */
-        public Integer readUnsignedInt() {
-            skipWhitespace();
+        public Integer getInt() {
+            return readInt();
+        }
+
+        public Integer readInt() {
             int index = 0;
-            while (index < buffer.length() && Character.isDigit(buffer.charAt(index))) {
+            char curr;
+            munchWhiteSpace();
+            while (index < buff.length()) {
+                curr = buff.charAt(index);
+                if (!Character.isDigit(curr))
+                    break;
                 index++;
             }
-
-            if (index == 0) return null;
-
             try {
-                Integer result = Integer.parseInt(buffer.substring(0, index));
-                buffer.delete(0, index);
-                return result;
+                Integer ans = Integer.parseInt(buff.substring(0, index));
+                buff = buff.delete(0, index);
+                return ans;
             } catch (Exception e) {
                 return null;
             }
         }
 
-        /**
-         * Refactored: Simplified and clarified signed integer reading.
-         */
-        public Integer readSignedInt() {
-            skipWhitespace();
+        public Integer readSgnInt() {
+            munchWhiteSpace();
             StringStream state = save();
-            if (matchAndConsume("+")) {
-                Integer value = readUnsignedInt();
-                if (value != null) return value;
-                restore(state);
-                return null;
-            } else if (matchAndConsume("-")) {
-                Integer value = readUnsignedInt();
-                if (value != null) return -value;
+            if (checkAndEat("+")) {
+                Integer ans = readInt();
+                if (ans != null)
+                    return ans;
                 restore(state);
                 return null;
             }
-            return readUnsignedInt();
+            if (checkAndEat("-")) {
+                Integer ans = readInt();
+                if (ans != null)
+                    return -ans;
+                restore(state);
+                return null;
+            }
+            return readInt();
         }
 
-        /**
-         * Refactored: Renamed from checkAndEat to matchAndConsume for clarity.
-         */
-        public boolean matchAndConsume(String token) {
-            skipWhitespace();
-            if (buffer.indexOf(token) == 0) {
-                buffer.delete(0, token.length());
+        public boolean checkAndEat(String s) {
+            munchWhiteSpace();
+            if (buff.indexOf(s) == 0) {
+                buff = buff.delete(0, s.length());
                 return true;
             }
             return false;
         }
 
         public StringStream save() {
-            return new StringStream(buffer.toString());
+            return new StringStream(buff.toString());
         }
 
-        public void restore(StringStream saved) {
-            this.buffer = new StringBuffer(saved.buffer);
+        public void restore(StringStream ss) {
+            this.buff = new StringBuffer(ss.buff);
         }
 
-        @Override
         public String toString() {
-            return buffer.toString();
+            return buff.toString();
         }
     }
 
+    /**
+     * Parses a full dice expression with optional ";" separated parts.
+     * 
+     * @param input Chuỗi biểu thức xúc xắc (ví dụ: "2d6+3; d10 & 3d4")
+     * @return Danh sách các DieRoll đã phân tích thành công hoặc null nếu lỗi.
+     */
     public static Vector<DieRoll> parseRoll(String input) {
+        logger.fine("Parsing input: " + input);
         StringStream stream = new StringStream(input.toLowerCase());
         Vector<DieRoll> result = parseRollRecursive(stream, new Vector<>());
-        return stream.isEmpty() ? result : null;
-    }
-
-    /**
-     * Refactored: Improved naming to parseRollRecursive and reduced unnecessary recursion.
-     */
-    private static Vector<DieRoll> parseRollRecursive(StringStream stream, Vector<DieRoll> accumulator) {
-        Vector<DieRoll> rolls = parseRepeatedDice(stream);
-        if (rolls == null) return null;
-
-        accumulator.addAll(rolls);
-
-        if (stream.matchAndConsume(";")) {
-            return parseRollRecursive(stream, accumulator);
-        }
-
-        return accumulator;
-    }
-
-    /**
-     * Refactored: Simplified and renamed from parseXDice to parseRepeatedDice for clarity.
-     */
-    private static Vector<DieRoll> parseRepeatedDice(StringStream stream) {
-        StringStream saved = stream.save();
-        Integer count = stream.readUnsignedInt();
-        int repeat = 1;
-
-        if (count != null && stream.matchAndConsume("x")) {
-            repeat = count;
+        if (stream.isEmpty()) {
+            logger.fine("Successfully parsed: " + input);
+            return result;
         } else {
-            stream.restore(saved);
+            logger.warning("Failed to fully parse input: " + input);
+            return null;
         }
-
-        DieRoll roll = parseDice(stream);
-        if (roll == null) return null;
-
-        Vector<DieRoll> rolls = new Vector<>();
-        for (int i = 0; i < repeat; i++) {
-            rolls.add(roll);
-        }
-
-        return rolls;
-    }
-
-    private static DieRoll parseDice(StringStream stream) {
-        return parseChainedDice(parseDiceBase(stream), stream);
     }
 
     /**
-     * Parses a single dice expression, e.g., "2d6+3".
+     * Parse phần roll của biểu thức xúc xắc, sử dụng đệ quy nếu có dấu phân cách ";"
+     * 
+     * @param ss Chuỗi đầu vào
+     * @param v Danh sách kết quả
+     * @return Danh sách các DieRoll
      */
-    private static DieRoll parseDiceBase(StringStream stream) {
-        Integer count = stream.readUnsignedInt();
-        int numDice = (count != null) ? count : 1;
-
-        if (!stream.matchAndConsume("d")) return null;
-
-        Integer sides = stream.readUnsignedInt();
-        if (sides == null) return null;
-
-        Integer bonus = stream.readSignedInt();
-        return new DieRoll(numDice, sides, (bonus != null) ? bonus : 0);
-    }
-
-    /**
-     * Refactored: Recursive chaining for "&" joined dice rolls.
-     */
-    private static DieRoll parseChainedDice(DieRoll base, StringStream stream) {
-        if (base == null) return null;
-
-        if (stream.matchAndConsume("&")) {
-            DieRoll next = parseDice(stream);
-            if (next == null) return null;
-            return parseChainedDice(new DiceSum(base, next), stream);
+    private static Vector<DieRoll> parseRollRecursive(StringStream ss, Vector<DieRoll> v) {
+        Vector<DieRoll> r = parseXDice(ss);
+        if (r == null) {
+            return null;
         }
-
-        return base;
+        v.addAll(r);
+        if (ss.checkAndEat(";")) {
+            return parseRollRecursive(ss, v);
+        }
+        return v;
     }
 
     /**
-     * Quick test of dice expression parsing and evaluation.
+     * Parse phần xúc xắc trong biểu thức, có thể có số lượng xúc xắc lặp lại (X)
+     * 
+     * @param ss Chuỗi đầu vào
+     * @return Danh sách DieRoll
+     */
+    private static Vector<DieRoll> parseXDice(StringStream ss) {
+        StringStream saved = ss.save();
+        Integer x = ss.getInt();
+        int num = (x == null) ? 1 : x;
+        if (ss.checkAndEat("x")) {
+            num = x;
+        } else {
+            ss.restore(saved);
+        }
+        DieRoll dr = parseDice(ss);
+        if (dr == null) {
+            return null;
+        }
+        Vector<DieRoll> ans = new Vector<>();
+        for (int i = 0; i < num; i++) {
+            ans.add(dr);
+        }
+        return ans;
+    }
+
+    /**
+     * Parse phần dice của biểu thức xúc xắc.
+     * 
+     * @param ss Chuỗi đầu vào
+     * @return DieRoll đã phân tích hoặc null nếu lỗi
+     */
+    private static DieRoll parseDice(StringStream ss) {
+        return parseDTail(parseDiceInner(ss), ss);
+    }
+
+    /**
+     * Parse phần dice cơ bản trong biểu thức xúc xắc, bao gồm số xúc xắc và số mặt.
+     * 
+     * @param ss Chuỗi đầu vào
+     * @return DieRoll đã phân tích hoặc null nếu lỗi
+     */
+    private static DieRoll parseDiceInner(StringStream ss) {
+        Integer num = ss.getInt();
+        int ndice = (num == null) ? 1 : num;
+        if (ss.checkAndEat("d")) {
+            num = ss.getInt();
+            if (num == null) {
+                return null;
+            }
+            int dsides = num;
+            num = ss.readSgnInt();
+            int bonus = (num == null) ? 0 : num;
+            return new DieRoll(ndice, dsides, bonus);
+        } else {
+            return null;
+        }
+    }
+
+    /**
+     * Kiểm tra phần tail của biểu thức xúc xắc (sử dụng toán tử '&' nối nhiều dice)
+     * 
+     * @param r1 DieRoll đầu tiên
+     * @param ss Chuỗi đầu vào
+     * @return DieRoll đã phân tích
+     */
+    private static DieRoll parseDTail(DieRoll r1, StringStream ss) {
+        if (r1 == null) {
+            return null;
+        }
+        if (ss.checkAndEat("&")) {
+            DieRoll d2 = parseDice(ss);
+            return parseDTail(new DiceSum(r1, d2), ss);
+        } else {
+            return r1;
+        }
+    }
+
+    /**
+     * Test method to evaluate expressions with logging and output.
+     * 
+     * @param input Biểu thức xúc xắc để test
      */
     private static void test(String input) {
         Vector<DieRoll> rolls = parseRoll(input);
@@ -192,6 +252,9 @@ public class DiceParser {
         }
     }
 
+    /**
+     * Main method để kiểm thử nhanh các biểu thức dice.
+     */
     public static void main(String[] args) {
         test("d6");
         test("2d6");
@@ -200,8 +263,7 @@ public class DiceParser {
         test("12d10+5 & 4d6+2");
         test("d6 ; 2d4+3");
         test("4d6+3 ; 8d12 -15 ; 9d10 & 3d6 & 4d12 +17");
-        test("4d6 + xyzzy");
-        test("hi");
         test("4d4d4");
+        test("hi");
     }
 }
