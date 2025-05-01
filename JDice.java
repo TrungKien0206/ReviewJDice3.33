@@ -169,7 +169,6 @@ public class JDice {
         LOGGER.info("JDice GUI started."); //  Log khi giao diện được hiển thị
     }
 
-    //  Hàm cấu hình logging đơn giản
     private static void setupLogging() {
         Logger rootLogger = Logger.getLogger("");
         Handler consoleHandler = new ConsoleHandler();
