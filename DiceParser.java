@@ -247,7 +247,7 @@ public class DiceParser {
         } else {
             System.out.println("Parsing: " + input);
             for (DieRoll roll : rolls) {
-                System.out.println(roll + ": " + roll.makeRoll());
+                System.out.println(roll + ": " + roll.roll());
             }
         }
     }
