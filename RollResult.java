@@ -92,7 +92,7 @@ public class RollResult { // Lỗi cú pháp: Thêm dấu '{' mở đầu classc
     }
 
     /**
-     * Trả về chuỗi biểu diễn của đối tượng RollResult hiện tại.
+     * 
      *
      * @return Chuỗi thể hiện tổng điểm, các roll, và modifier nếu có
      */
