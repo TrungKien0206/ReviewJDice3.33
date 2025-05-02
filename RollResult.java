@@ -74,10 +74,9 @@ public class RollResult { // Lỗi cú pháp: Thêm dấu '{' mở đầu classc
     }
 
     /*** Kết hợp đối tượng hiện tại với một đối tượng RollResult khác. Tổng điểm,
-     * modifier và danh sách rolls sẽ được gộp lại.
      *
      * @param r2 Đối tượng RollResult cần gộp
-     * @return Một đối tượng RollResult mới chứa kết quả tổng hợp
+     * @return
      */
     public RollResult andThen(RollResult r2) {
         /**
@@ -93,7 +92,7 @@ public class RollResult { // Lỗi cú pháp: Thêm dấu '{' mở đầu classc
     }
 
     /**
-     * Trả về chuỗi biểu diễn của đối tượng RollResult hiện tại.
+     * 
      *
      * @return Chuỗi thể hiện tổng điểm, các roll, và modifier nếu có
      */

@@ -39,7 +39,6 @@ public class DiceSum extends DieRoll {
         return combined;
     }
 
-    // ✅ Helper method: Tính tổng điểm từ makeRoll()
     public int getTotalRollValue() {
         RollResult result = roll();
         return result.getTotal() + 1; 

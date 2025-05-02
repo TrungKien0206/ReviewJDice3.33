@@ -31,7 +31,7 @@ public class DieRoll {
     /**
      * Constructor tạo một lần tung xúc xắc.
      * 
-     * @param numDice Số xúc xắc
+     * @param numDice 
      * @param numSides Số mặt của mỗi xúc xắc
      * @param bonus Điểm thưởng thêm vào kết quả
      * @throws IllegalArgumentException nếu số xúc xắc hoặc số mặt nhỏ hơn 1
